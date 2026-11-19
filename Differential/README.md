@@ -93,11 +93,11 @@ to `FirstReturn`) and applies `not_agree_of_retRax`.
 | Check time | under 4 minutes per theorem, exports of 4 to 50 MB | about 10 s for all four theorems | under 1 s |
 | Scope of the result | every call | one call | the calls that were tried |
 | Finds the evex bug | yes | yes, if you give it the input | yes, only with inputs near `n = 2^32` |
-| Finds the avx2 bug | yes: the open proof obligations pointed at it | yes, if you give it the input | no: page 0 cannot be mapped without root |
+| Finds the avx2 bug | yes: per the blog post, the open proof obligations pointed at it | yes, if you give it the input | no: page 0 cannot be mapped without root |
 
-The native test ran 2,000,000 random calls near page edges and found **no** difference. Then it ran 24 calls with `n`
-near `2^32`, and 10 of them showed the evex bug. Testing found the evex bug only because the input was chosen
-for it.
+The native test's 2,000,000 random calls have `n < 700` and objects away from page 0, so by construction they cannot
+reach either bug, and they show no difference. The 24 calls with `n` near `2^32` were chosen for the evex bug, and 10
+of them show it.
 
 ### Findings
 
@@ -106,8 +106,9 @@ for it.
    counterexample from any source (a fuzzer, a review, a failed proof obligation) becomes a checked theorem in
    minutes, without a spec.
 2. **Relational verification does not find the input.** The hard part is the witness. The evex bug needs
-   `n ≥ 2^32` and a last byte at the start of a page. The avx2 bug needs page 0 mapped. Random differential testing
-   found neither. The e2e proof found the avx2 bug, because it had to cover every call.
+   `n ≥ 2^32` and a last byte in the first 32 bytes of a page. The avx2 bug needs page 0 mapped. A random input
+   generator must aim at these cases to hit them. The blog post reports that the avx2 bug was found from the e2e
+   proof's last open obligations, not by a test.
 3. **Equivalence of different algorithms is not easier than e2e.** evex, avx2 and sse2 scan with different window
    sizes and alignments, so their loops do not run in lockstep. The invariant that relates two such loops says
    "both have the correct result for the bytes scanned so far". That is the spec. A proof of `Agree evex sse2` for

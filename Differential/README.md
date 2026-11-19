@@ -105,10 +105,12 @@ of them show it.
    function, so a 4 GiB object costs nothing. The six runs here (22 to 95 instructions each) take 8.5 s together. A
    counterexample from any source (a fuzzer, a review, a failed proof obligation) becomes a checked theorem in
    minutes, without a spec.
-2. **Relational verification does not find the input.** The hard part is the witness. The evex bug needs
-   `n ≥ 2^32` and a last byte in the first 32 bytes of a page. The avx2 bug needs page 0 mapped. A random input
-   generator must aim at these cases to hit them. The blog post reports that the avx2 bug was found from the e2e
-   proof's last open obligations, not by a test.
+2. **Relational verification does not find the input.** The hard part is the witness. The evex bug occurs only for
+   `n ≥ 2^32`, because the release proves evex correct below that (`evexHolds`, `evexOk`). The known witnesses
+   (`evexBug`'s and ours) also put the last byte in the first 32 bytes of a page. The avx2 bug occurs only for
+   `s < 32` (`avx2Holds`, `avx2Ok`), so page 0 must be mapped. A random input generator must aim at these cases to
+   hit them. The blog post reports that the avx2 bug was found from the e2e proof's last open obligations, not by a
+   test.
 3. **Equivalence of different algorithms is not easier than e2e.** evex, avx2 and sse2 scan with different window
    sizes and alignments, so their loops do not run in lockstep. The invariant that relates two such loops says
    "both have the correct result for the bytes scanned so far". That is the spec. A proof of `Agree evex sse2` for

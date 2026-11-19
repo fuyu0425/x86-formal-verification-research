@@ -17,12 +17,39 @@ Lean's kernel checks each theorem (`Memrchr.lean`). Each depends only on `propex
 | `avx2_sse2_disagree` | page 0 mapped, `s = 5`, `n = 140`, `c` absent | avx2 returns `0xffffffffffffffff`, sse2 returns `0` |
 | `avx2_avx2Fixed_disagree` | the same | the `jb` fix returns `0` |
 
-Each theorem has the form `¬ Agree code₁ code₂ (MemrchrCalls code₁ code₂)`:
+Each theorem has the same form. This is the evex one (`Memrchr.lean`):
 
-- `Agree` (`Relational.lean`): for each input in the set, if both codes return, they return the same `rax`. "Return"
-  is the first state of the model's `run` at the return address (`FirstReturn`).
-- `MemrchrCalls`: the input is a valid call of `memrchr` for both codes, by the release's own `CallOf` of `C.memrchr`
-  (`Valid.lean`). So the disagreement does not come from an invalid input.
+```lean
+theorem evex_sse2_disagree : ¬ Agree Code.evex Code.sse2 (MemrchrCalls Code.evex Code.sse2)
+```
+
+The relation is `Agree` (`Relational.lean`). On each input in `P`, if both codes return, they return the same `rax`:
+
+```lean
+def Agree (code₁ code₂ : List Byte) (P : Input → Prop) : Prop :=
+  ∀ i, P i → ∀ X₁ X₂, FirstReturn prof quiet (call code₁ i) 0 ra X₁ → FirstReturn prof quiet (call code₂ i) 0 ra X₂ →
+    X₁.cpu.gpr.rax = X₂.cpu.gpr.rax
+```
+
+"Return" is the first state of the model's own `run` at the return address:
+
+```lean
+def FirstReturn (prof : Profile) (o : Oracle) (s₀ : State) (t : Nat) (ra : Addr) (X : State) : Prop :=
+  ∃ n evs t', run prof o n s₀ t = (.running X, evs, t') ∧ X.cpu.rip = ra ∧
+    ∀ m < n, ∀ Y evs' t'', run prof o m s₀ t = (.running Y, evs', t'') → Y.cpu.rip ≠ ra
+```
+
+The inputs in `P` are valid calls of `memrchr` for both codes, by the release's own `CallOf` of `C.memrchr`
+(`Valid.lean`). So the disagreement does not come from an invalid input:
+
+```lean
+def MemrchrCalls (code₁ code₂ : List Byte) (i : Input) : Prop :=
+  CallOf prof entry [(entry, code₁)] C.memrchr (call code₁ i) ra ∧
+    CallOf prof entry [(entry, code₂)] C.memrchr (call code₂ i) ra
+```
+
+The proof evaluates both runs with `decide +kernel` (`retRax`, a fuel-bounded runner that `retRax_firstReturn` ties
+to `FirstReturn`) and applies `not_agree_of_retRax`.
 
 ## How to check
 

@@ -118,26 +118,34 @@ of them show it.
    not a measurement. It would still need sse2's e2e proof to say that the shared result is correct.
 4. **Equivalence of nearly identical code is where relational verification is easier.** The shipped evex and the
    fixed evex differ in one instruction at offset `0x238` and one jump displacement at `0x227`. A lockstep proof
-   relates two states that differ only in the code bytes. It needs no loop invariant and no knowledge of the
-   algorithm. The proof needs three parts (not built here):
+   relates two states that differ only in the code bytes. It needs no loop invariant about the values computed. The
+   proof needs three parts (not built here):
    - A generic step theorem for the model: from two states that differ only in code bytes that the instruction does
      not fetch, one step gives two states that differ in the same way. The decoder reads at most 15 bytes
-     (`Decode.next`), and the interpreter reaches memory only through `check`, `readByte` and `writeByte`
-     (`Machine.lean`). This part is written once for the model.
-   - A frame fact: no data read reaches the bytes that differ. An e2e contract gives this through `reads`. Without a
-     contract, an execute-only code page (a protection key, `pkeyDenies`) gives it.
+     (`Decode.next`). The interpreter, `Prog.run` (`Machine.lean:349`), reaches memory only through
+     `checkAccess`, `checkBytes` and `checkEach`, then `readBytes`, `readSelBytes`, `writeBytes` and `writeSelBytes`.
+     This part is written once for the model.
+   - A frame lemma: no data read reaches the bytes that differ. This is a separate proof about which addresses the
+     code reads. The release's contracts bound writes and control flow (`Statement.lean:402-405, 451`), and I found
+     no bound on data reads there, so an e2e proof does not obviously give it. An execute-only code page
+     (`feat.pku`, a protection key on the code page, and a `PKRU` that denies it: `pkeyDenies`) would make the lemma
+     automatic. But that is a different environment from the release's statements, so a proof under it says
+     nothing about the normal process.
    - A local proof at the three instructions that differ. After the `sub`, the two `rdx` values are equal when
      `n < 2^32`. This gives `Agree evex evexFixed (n < 2^32)` for every call.
 
-   [INFERENCE] The generic part is several days of work, and each patch after that takes hours. This is the best
-   fit for relational proofs: patches, backports and rebuilds of code that is already proved or trusted.
+   [INFERENCE] The generic part is several days of work, and each patch after that takes hours plus its frame
+   lemma. This is the best fit for relational proofs: patches, backports and rebuilds of code that is already
+   proved or trusted.
 5. **A differential result needs a reference.** If every variant has the same bug, they all agree, and differential
    checking finds nothing. This is the main limit of relational verification compared with e2e.
 
 ### Practical workflow
 
-The release already states e2e theorems for all six variants (`MemrchrStatement.lean:65-91`). The bugs are carve-outs
-in those statements, not missing proofs:
+The release states e2e theorems for all six variants (`MemrchrStatement.lean:65-91`) and ships their proof exports.
+All six exports pass `checks/ID/verify-source.sh` on this machine: sse2, evex, avx2, avx2-rtm, evex-fixed and
+avx2-fixed, each "Your solution is okay!" in 48 to 223 s. The bugs are carve-outs in those statements, not missing
+proofs:
 
 | Statement | Calls it covers |
 |---|---|

@@ -113,9 +113,9 @@ of them show it.
    test.
 3. **Equivalence of different algorithms is not easier than e2e.** evex, avx2 and sse2 scan with different window
    sizes and alignments, so their loops do not run in lockstep. The invariant that relates two such loops says
-   "both have the correct result for the bytes scanned so far". That is the spec. A proof of `Agree evex sse2` for
-   all calls with `n < 2^32` would cost about as much as the e2e proofs, and it would still need sse2's e2e proof to
-   say that the shared result is correct.
+   "both have the correct result for the bytes scanned so far". That is the spec. [INFERENCE] A proof of
+   `Agree evex sse2` for all calls with `n < 2^32` would cost about as much as the e2e proofs. This is an estimate,
+   not a measurement. It would still need sse2's e2e proof to say that the shared result is correct.
 4. **Equivalence of nearly identical code is where relational verification is easier.** The shipped evex and the
    fixed evex differ in one instruction at offset `0x238` and one jump displacement at `0x227`. A lockstep proof
    relates two states that differ only in the code bytes. It needs no loop invariant and no knowledge of the
@@ -134,11 +134,36 @@ of them show it.
 5. **A differential result needs a reference.** If every variant has the same bug, they all agree, and differential
    checking finds nothing. This is the main limit of relational verification compared with e2e.
 
-### Recommendation
+### Practical workflow
 
-- Use differential refutations as a cheap first step. Turn each confirmed counterexample into a kernel-checked
-  theorem, as in `Memrchr.lean`.
-- Use lockstep relational proofs for patch validation. Build the generic step theorem once. Then each fix, such as
-  the `subq` and `jb` patches, is checked against the shipped code without a new loop invariant.
-- Keep e2e proofs for at least one reference variant. They find bugs that no one thought to test for (the avx2 bug)
-  and they make the reference correct.
+The release already states e2e theorems for all six variants (`MemrchrStatement.lean:65-91`). The bugs are carve-outs
+in those statements, not missing proofs:
+
+| Statement | Calls it covers |
+|---|---|
+| `sse2Holds` | every call (with `sse2Reads`) |
+| `evexHolds` | `n < 2^32` (`evexOk`) |
+| `avx2Holds`, `avx2RtmHolds` | `s ≥ 32` (`avx2Ok`) |
+| `evexFixedHolds`, `avx2FixedHolds` | every call |
+
+Relational verification adds two things to that:
+
+1. **Cheap refutations.** Turn each confirmed counterexample (from a fuzzer, a review, or a failed proof obligation)
+   into a kernel-checked theorem, as in `Memrchr.lean`. Do this first. It takes seconds and needs no spec.
+2. **A cheaper route to derived variants.** [INFERENCE] These are estimates, and the generic step theorem of
+   finding 4 does not exist yet.
+   - `avx2RtmHolds`, fully: glibc 2.43's `memrchr-avx2-rtm.S` redefines only the return macros and then includes
+     `memrchr-avx2.S`. A lockstep proof against avx2, with `avx2Holds`, gives the same statement and the same
+     `s ≥ 32` carve-out.
+   - `evexFixedHolds` and `avx2FixedHolds`, partly: lockstep with the shipped code covers only the calls where the
+     shipped code is correct (`n < 2^32`, `s ≥ 32`). The calls that the fix repairs still need a local e2e argument
+     on the changed path, because there the shipped code is the wrong reference.
+
+For a new variant:
+
+- If it is a small diff of a proved variant (an rtm build, a patch, a backport, a rebuild), use a lockstep relational
+  proof against that variant.
+- If its algorithm is different, write its own e2e statement and proof. [INFERENCE] A relational proof against
+  another variant would cost about the same, because the invariant that couples two different loops is the spec.
+- Keep an e2e proof of at least one reference variant. It finds bugs that no test aims at (per the blog post, the
+  avx2 bug), and it gives "agrees with the reference" its meaning.

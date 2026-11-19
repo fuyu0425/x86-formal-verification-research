@@ -441,6 +441,9 @@ table of `main`'s stack use. Not counted: the generated files, the library's pro
 - `ReleaseChallenges/`: each exported theorem stated by `sorry`, the challenges `checks/ID/verify-source.sh` builds.
 - `checks/ID/`: each theorem's checker configuration and script; `exports/SHA256SUMS`: the proof exports' checksums (the
   exports themselves are downloaded into `exports/`).
+- `Differential/`: the `memrchr` variants compared with each other, not with a contract: kernel-checked runs in the
+  model that refute their equivalence on the two bugs' calls (`lake build Differential`), and an evaluation of
+  relational against end-to-end proofs (`Differential/README.md`).
 - `CHANGES.md`: what each release changed.
 - `THIRD-PARTY-NOTICES.md` and `LICENSES/`: the material from glibc and the Linux kernel that this repository and the
   proof exports contain (the binaries, the functions' bytes, the vDSO's tables), its licenses and where its source is.

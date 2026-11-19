@@ -38,3 +38,8 @@ roots = ["Glibc243UbuntuClients.Admin.Statement", "Glibc243UbuntuClients.Admin2.
 [[lean_lib]]
 name = "ReleaseChallenges"
 globs = ["ReleaseChallenges.+"]
+
+# Differential checks of the `memrchr` variants against each other: concrete runs in the model (not a default target).
+[[lean_lib]]
+name = "Differential"
+globs = ["Differential.+"]
